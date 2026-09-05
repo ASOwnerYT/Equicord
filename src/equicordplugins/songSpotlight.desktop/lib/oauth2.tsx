@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { openModal } from "@utils/modal";
 import { ApplicationIntegrationType } from "@vencord/discord-types/enums";
-import { OAuth2AuthorizeModal, showToast, Toasts } from "@webpack/common";
+import { OAuth2AuthorizeModal, openModal,showToast, Toasts } from "@webpack/common";
 
 import { apiConstants, authFetch, getData } from "./api";
 import { useAuthorizationStore } from "./stores/AuthorizationStore";
@@ -30,15 +29,22 @@ export function presentOAuth2Modal() {
                     const url = new URL(location);
                     url.searchParams.append("whois", "equicord");
 
-                    const token = await (await authFetch(url))?.text();
-                    if (!token) return;
+                    const res = await authFetch(url);
+                    if (!res) throw "Response wasn't ok";
 
-                    useAuthorizationStore.getState().setToken(token);
+                    const access = await res.text();
+                    if (!access) throw "Access token is missing";
+
+                    const refresh = res.headers.get("X-Refresh-Token");
+                    if (!refresh) throw "Refresh token is missing";
+
+                    useAuthorizationStore.getState().setToken(access, refresh);
                     getData();
 
                     showToast("Successfully authorized!", Toasts.Type.SUCCESS);
                 } catch (error) {
                     logger.error("Got an error during OAuth2", error);
+                    if (typeof error === "string") showToast(error, Toasts.Type.FAILURE);
                 }
             }}
         />

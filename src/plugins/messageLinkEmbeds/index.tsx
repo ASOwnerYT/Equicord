@@ -22,7 +22,6 @@ import { definePluginSettings } from "@api/Settings";
 import { getUserSettingLazy } from "@api/UserSettings";
 import { BaseText } from "@components/BaseText";
 import { Devs } from "@utils/constants.js";
-import { classes } from "@utils/misc";
 import { Queue } from "@utils/Queue";
 import definePlugin, { OptionType } from "@utils/types";
 import { Channel, Message } from "@vencord/discord-types";
@@ -40,7 +39,7 @@ import {
     RestAPI,
     UserStore
 } from "@webpack/common";
-import { JSX } from "react";
+import { ComponentType, JSX } from "react";
 
 const messageCache = new Map<string, {
     message?: Message;
@@ -48,10 +47,9 @@ const messageCache = new Map<string, {
 }>();
 
 const Embed = findComponentLazy(m => m.prototype?.renderSuppressButton);
-const AutoModEmbed = findComponentByCodeLazy("withFooter", "childrenMessageContent:");
 const ChannelMessage = findComponentByCodeLazy("childrenExecutedCommand:", ".hideAccessories");
+let AutoModEmbed: ComponentType<any> = () => null;
 
-const SearchResultClasses = findCssClassesLazy("message", "searchResult");
 const EmbedClasses = findCssClassesLazy("embedAuthorIcon", "embedAuthor", "embedAuthor", "embedMargin");
 
 const MessageDisplayCompact = getUserSettingLazy("textAndImages", "messageDisplayCompact")!;
@@ -113,6 +111,7 @@ const settings = definePluginSettings({
         ]
     },
     idList: {
+        displayName: "ID List",
         description: "Guild/channel/user IDs to blacklist or whitelist (separate with comma)",
         type: OptionType.STRING,
         default: "",
@@ -146,7 +145,7 @@ async function fetchMessage(channelID: string, messageID: string) {
     const msg = res?.body?.[0];
     if (!msg) return;
 
-    const message: Message = MessageStore.getMessages(msg.channel_id).receiveMessage(msg).get(msg.id);
+    const message = MessageStore.getMessages(msg.channel_id).receiveMessage(msg).get(msg.id);
     if (!message) return;
 
     messageCache.set(message.id, {
@@ -302,7 +301,12 @@ function ChannelMessageEmbedAccessory({ message, channel }: MessageEmbedProps): 
                 }
             }}
             renderDescription={() => (
-                <div key={message.id} className={classes(SearchResultClasses.message, settings.store.messageBackgroundColor && SearchResultClasses.searchResult)}>
+                <div key={message.id} style={!settings.store.messageBackgroundColor ? undefined : {
+                    backgroundColor: "var(--background-base-lower)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: "8px",
+                    paddingBottom: "8px",
+                }}>
                     <ChannelMessage
                         id={`message-link-embeds-${message.id}`}
                         message={message}
@@ -349,7 +353,7 @@ function AutomodEmbedAccessory(props: MessageEmbedProps): JSX.Element | null {
                     const { width, height } = computeWidthAndHeight(a.width, a.height);
                     return (
                         <div key={idx}>
-                            <img src={a.url} width={width} height={height} />
+                            <img src={a.proxyURL ?? a.url} width={width} height={height} />
                         </div>
                     );
                 })}
@@ -364,10 +368,25 @@ function AutomodEmbedAccessory(props: MessageEmbedProps): JSX.Element | null {
 export default definePlugin({
     name: "MessageLinkEmbeds",
     description: "Adds a preview to messages that link another message",
+    tags: ["Chat", "Appearance"],
     authors: [Devs.TheSun, Devs.Ven, Devs.RyanCaoDev],
     dependencies: ["MessageAccessoriesAPI", "MessageUpdaterAPI", "UserSettingsAPI"],
 
     settings,
+
+    patches: [
+        {
+            find: "!1,withFooter:",
+            replacement: {
+                match: /(?=function (\i)\(\i\){let{message:\i,channel:\i,[^}]+?withFooter:)/,
+                replace: "$self.AutoModEmbed=$1;"
+            }
+        }
+    ],
+
+    set AutoModEmbed(value: any) {
+        AutoModEmbed = value;
+    },
 
     start() {
         addMessageAccessory("MessageLinkEmbeds", props => {

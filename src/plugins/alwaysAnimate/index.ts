@@ -51,6 +51,7 @@ const settings = definePluginSettings({
 export default definePlugin({
     name: "AlwaysAnimate",
     description: "Animates anything that can be animated",
+    tags: ["Appearance", "Fun"],
     authors: [Devs.FieryFlames],
     settings,
     patches: [
@@ -88,12 +89,28 @@ export default definePlugin({
             }
         },
         {
+            // Gradient roles in chat
+            find: "=!1,contentOnly:",
+            replacement: {
+                match: /animate:\i/,
+                replace: "animate:!0"
+            }
+        },
+        {
+            // Gradient roles in member list
+            find: '="left",className:',
+            replacement: {
+                match: /,animateGradient:/,
+                replace: ",animateGradient:!0,_oldAnimateGradient:"
+            }
+        },
+        {
             // Nameplates
             find: ".MINI_PREVIEW,[",
             predicate: () => settings.store.nameplates,
             replacement: {
-                match: /animate:\i,loop:.{0,15}===\i/,
-                replace: "animate:true,loop:true"
+                match: /animate:\i,loop:/,
+                replace: "animate:true,loop:true,_loop:"
             },
         },
         {

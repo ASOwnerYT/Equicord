@@ -12,10 +12,9 @@ import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { Devs, EquicordDevs } from "@utils/constants";
 import { classNameFactory } from "@utils/css";
-import { closeModal, openModal } from "@utils/modal";
 import definePlugin, { OptionType } from "@utils/types";
 import { Channel } from "@vencord/discord-types";
-import { Menu, Tooltip, useEffect, useState } from "@webpack/common";
+import { Menu, openModal, Tooltip, useEffect, useState } from "@webpack/common";
 
 import { Boo, clearChannelFromGhost, getBooCount, getGhostedChannels, onBooCountChange } from "./Boo";
 import { getChannelDisplayName, GhostedUsersModal } from "./GhostedUsersModal";
@@ -52,12 +51,23 @@ export const settings = definePluginSettings({
         description: "Ignore DMs from bots",
         default: true,
         restartNeeded: false
+    },
+    maxInactiveTimeMs: {
+        type: OptionType.SELECT,
+        description: "Only ghost DMs active within this timeframe",
+        options: [
+            { label: "No limit", value: 0, default: true },
+            { label: "1 hour", value: 60 * 60 * 1000 },
+            { label: "1 day", value: 24 * 60 * 60 * 1000 },
+            { label: "1 week", value: 7 * 24 * 60 * 60 * 1000 },
+            { label: "1 month", value: 30 * 24 * 60 * 60 * 1000 },
+        ],
+        restartNeeded: false
     }
 });
 
 function BooIndicator() {
     const [count, setCount] = useState(getBooCount());
-    const [showJumpscare, setShowJumpscare] = useState(false);
 
     useEffect(() => {
         const unsubscribe = onBooCountChange(newCount => {
@@ -69,16 +79,15 @@ function BooIndicator() {
         };
     }, []);
 
-    if (!settings.store.showIndicator && !showJumpscare) return null;
+    if (!settings.store.showIndicator) return null;
 
     const handleClick = () => {
         const ghostedChannels = getGhostedChannels();
-        const modalKey = openModal(modalProps => (
+        openModal(modalProps => (
             <ErrorBoundary>
                 <GhostedUsersModal
                     modalProps={modalProps}
                     ghostedChannels={ghostedChannels}
-                    onClose={() => closeModal(modalKey)}
                     onClearGhost={clearChannelFromGhost}
                 />
             </ErrorBoundary>
@@ -135,6 +144,7 @@ function makeContextItem(props) {
 export default definePlugin({
     name: "Ghosted",
     description: "A cute ghost will appear if you don't answer their DMs",
+    tags: ["Chat", "Utility"],
     authors: [EquicordDevs.vei, Devs.sadan, EquicordDevs.justjxke, EquicordDevs.iamme],
     settings,
     dependencies: ["AudioPlayerAPI", "ServerListAPI"],

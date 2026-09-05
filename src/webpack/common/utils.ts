@@ -46,11 +46,9 @@ export const Constants: t.Constants = mapMangledModuleLazy('ME:"/users/@me"', {
 export const RestAPI: t.RestAPI = findLazy(m => typeof m === "object" && m.del && m.put);
 export const moment: typeof import("moment") = findByPropsLazy("parseTwoDigitYear");
 
-export const hljs: typeof import("highlight.js").default = findByPropsLazy("highlight", "registerLanguage");
-
 export const useDrag = findByCodeLazy("useDrag::spec.begin was deprecated");
 // you cant make a better finder i love that they remove display names sm
-export const useDrop = findByCodeLazy(".options);return", ".collect,");
+export const useDrop = findByCodeLazy(".disconnectDropTarget()", ".dropTargetOptions=");
 
 export const { match, P }: { match: typeof TSPattern["match"], P: typeof TSPattern["P"]; } = mapMangledModuleLazy("@ts-pattern/matcher", {
     match: filters.byCode("return new"),
@@ -108,26 +106,34 @@ export interface ToastOptions {
     duration?: number;
 }
 
+interface ToastsExports {
+    showToast: (data: ToastData) => void;
+    popToast(): void;
+}
+
+const ToastsExports = mapMangledModuleLazy(".currentToastMap.has(", {
+    showToast: filters.byCode(".currentToastMap.has("),
+    popToast: filters.byCode(".delete(")
+});
+
+export function createToast(message: string, type: string, options?: ToastOptions): ToastData {
+    return {
+        message,
+        id: Toasts.genId(),
+        type,
+        options
+    };
+}
+
 export const Toasts = {
     Type: ToastType,
     Position: ToastPosition,
-    // what's less likely than getting 0 from Math.random()? Getting it twice in a row
     genId: () => (Math.random() || Math.random()).toString(36).slice(2),
 
-    // hack to merge with the following interface, dunno if there's a better way
-    ...{} as {
-        show(data: ToastData): void;
-        pop(): void;
-        create(message: string, type: string, options?: ToastOptions): ToastData;
-    }
+    show: ToastsExports.showToast,
+    pop: ToastsExports.popToast,
+    create: createToast,
 };
-
-// This is the same module but this is easier
-waitFor("showToast", m => {
-    Toasts.show = m.showToast;
-    Toasts.pop = m.popToast;
-    Toasts.create = m.createToast;
-});
 
 /**
  * Show a simple toast. If you need more options, use Toasts.show manually
@@ -192,7 +198,7 @@ export const IconUtils: t.IconUtils = findByPropsLazy("getGuildBannerURL", "getU
 
 export const ColorUtils = mapMangledModuleLazy("Invalid hex color format", {
     rgbToHex: filters.byCode(".toString(16).slice(1)"),
-    hexToRgba: filters.byCode("rgba(", "??"),
+    hexToRgba: filters.byCode("`rgba(${"),
     hexToRgb: filters.byCode(".rgb();return"),
     rgbToHsl: filters.byCode("saturation:", "lightness:"),
     mixColors: filters.byCode(".substring(1,3),16)"),
@@ -220,7 +226,7 @@ export const ExpressionPickerStore: t.ExpressionPickerStore = mapMangledModuleLa
     openExpressionPicker: filters.byCode(/setState\({activeView:(?:(?!null)\i),activeViewType:/),
     closeExpressionPicker: filters.byCode("setState({activeView:null"),
     toggleMultiExpressionPicker: filters.byCode(".EMOJI,"),
-    toggleExpressionPicker: filters.byCode(/getState\(\)\.activeView===\i\?\i\(\):\i\(/),
+    toggleExpressionPicker: filters.byCode(/\i\.activeView===\i&&\i\.activeViewType===\i&&/),
     setExpressionPickerView: filters.byCode(/setState\({activeView:\i,lastActiveView:/),
     setSearchQuery: filters.byCode("searchQuery:"),
     useExpressionPickerStore: filters.byCode(/\(\i,\i=\i\)=>/)

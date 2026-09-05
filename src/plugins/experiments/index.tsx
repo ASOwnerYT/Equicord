@@ -14,14 +14,12 @@ import { Paragraph } from "@components/Paragraph";
 import { Devs, IS_MAC } from "@utils/constants";
 import { Margins } from "@utils/margins";
 import definePlugin, { OptionType } from "@utils/types";
-import { findByPropsLazy, findLazy } from "@webpack";
-import { React } from "@webpack/common";
+import { findByPropsLazy } from "@webpack";
+import { ExperimentStore, React } from "@webpack/common";
 
 import hideBugReport from "./hideBugReport.css?managed";
 
 const KbdStyles = findByPropsLazy("key", "combo");
-const BugReporterExperiment = findLazy(m => m?.definition?.name === "2026-01-bug-reporter");
-
 const modKey = IS_MAC ? "cmd" : "ctrl";
 const altKey = IS_MAC ? "opt" : "alt";
 
@@ -37,6 +35,7 @@ const settings = definePluginSettings({
 export default definePlugin({
     name: "Experiments",
     description: "Enable Access to Experiments & other dev-only features in Discord!",
+    tags: ["Developers", "Utility"],
     authors: [
         Devs.Megu,
         Devs.Ven,
@@ -65,10 +64,18 @@ export default definePlugin({
         },
         {
             find: 'placeholder:"Search experiments"',
-            replacement: {
-                match: /(?<=children:\[)(?=\(0,\i\.jsx?\)\(\i\.\i,{placeholder:"Search experiments")/,
-                replace: "$self.WarningCard(),"
-            }
+            replacement: [
+                {
+                    match: /(?<=children:\[)(?=null!=.{0,150}"Installation ID:)/,
+                    replace: "$self.WarningCard(),"
+                },
+                // for some reason the installation id and copy buttons are on
+                // different lines so it looks stupid when the card above is added
+                {
+                    match: /(?<=,marginBottom:16)(?=\},children:\[)/,
+                    replace: ',flexDirection:"row",alignItems:"center"'
+                }
+            ]
         },
         // Change top right toolbar button from the help one to the dev one
         {
@@ -87,21 +94,12 @@ export default definePlugin({
                 replace: (_, rest) => `${rest}onClick:()=>{}`
             }
         },
-        // Make the Favourites Server experiment allow favouriting DMs and threads
-        {
-            find: "useCanFavoriteChannel",
-            replacement: {
-                match: /(?<=isFavorite\(\i\.id\).{0,5})\i\.isThread\(\)/,
-                replace: "false",
-            }
-        },
         // Enable experiment embed on sent experiment links
         {
             find: "Clear Treatment ",
             replacement: [
                 {
-                    // TODO: stable compat optional chaining remove once some time has passed
-                    match: /\i\??\.isStaff\(\)/,
+                    match: /\i\?\.isStaff\(\)/,
                     replace: "true"
                 },
                 // Fix some tricky experiments name causing a client crash
@@ -123,9 +121,9 @@ export default definePlugin({
         // dev://playground/mana, dev://playground/payments, dev://playground/virtual-currency,
         // dev://playground/nitro, dev://playground/mfa, dev://playground/cms, dev://playground/void
         {
-            find: "{PlaygroundEmbed:()=>",
+            find: ".useComponentPlaygroundConfigs)()",
             replacement: {
-                match: /PotionIcon.{0,250}getCurrentUser\(\);return/,
+                match: /"Revenue".{0,250}getCurrentUser\(\);return/,
                 replace: "$& true||"
             }
         },
@@ -133,7 +131,7 @@ export default definePlugin({
             // Expands the experiment regex to allow negative numbers as well as text in the last segment of the URL.
             find: '"^dev://experiment/',
             replacement: {
-                match: /(\[0-9\]\+)/,
+                match: /\[0-9\]\+(?=\)\)\?\$")/,
                 replace: "[a-zA-Z0-9-]+"
             }
         },
@@ -146,9 +144,8 @@ export default definePlugin({
                     replace: "{return($1)||($self.matchExperiment(arguments[0].url,$2.label))}"
                 }
             ]
-        }
+        },
     ],
-
     matchExperiment(url: string, label: string): boolean {
         const items = url.split("/");
         const labelCleaned = label.replace(/[^a-zA-Z0-9]+/g, "").toLowerCase();
@@ -156,7 +153,7 @@ export default definePlugin({
         return !!labelCleaned && urlEndCleaned !== undefined && labelCleaned === urlEndCleaned;
     },
 
-    start: () => !BugReporterExperiment.getConfig().hasBugReporterAccess && enableStyle(hideBugReport),
+    start: () => ExperimentStore.getUserExperimentBucket("2026-01-bug-reporter") > 0 && enableStyle(hideBugReport),
     stop: () => disableStyle(hideBugReport),
 
     settingsAboutComponent: () => {
@@ -166,8 +163,8 @@ export default definePlugin({
                 <BaseText size="md">
                     You can open Discord's DevTools via {" "}
                     <div className={KbdStyles.combo} style={{ display: "inline-flex" }}>
-                        <kbd className={KbdStyles.key}>{modKey}</kbd> +{" "}
-                        <kbd className={KbdStyles.key}>{altKey}</kbd> +{" "}
+                        <kbd className={KbdStyles.key}>{modKey}</kbd>{" "}
+                        <kbd className={KbdStyles.key}>{altKey}</kbd>{" "}
                         <kbd className={KbdStyles.key}>O</kbd>{" "}
                     </div>
                 </BaseText>

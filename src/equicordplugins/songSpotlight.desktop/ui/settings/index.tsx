@@ -20,8 +20,8 @@ import { UserData, UserDataSchema } from "@song-spotlight/api/structs";
 import { sid } from "@song-spotlight/api/util";
 import { readClipboard } from "@utils/clipboard";
 import { copyWithToast } from "@utils/discord";
-import { ModalContent, ModalHeader, ModalProps, ModalRoot, ModalSize, openModal } from "@utils/modal";
-import { Alerts, Parser, showToast, Toasts, useCallback, useEffect, useMemo, useRef, useState } from "@webpack/common";
+import { RenderModalProps } from "@vencord/discord-types";
+import { Alerts, Modal,openModal, Parser, showToast, Toasts, useCallback, useEffect, useMemo, useRef, useState } from "@webpack/common";
 
 interface ImportButtonProps {
     overwrite: boolean;
@@ -85,7 +85,7 @@ interface SettingsProps {
 }
 
 export default function Settings({ templateData }: SettingsProps) {
-    const { isAuthorized, deleteToken } = useAuthorizationStore();
+    const { isAuthorized, deleteTokens } = useAuthorizationStore();
     const { self } = useSongStore();
 
     const ticked = useRef(false);
@@ -172,7 +172,7 @@ export default function Settings({ templateData }: SettingsProps) {
                     <Button
                         variant="dangerPrimary"
                         onClick={() => {
-                            deleteToken();
+                            deleteTokens();
                             showToast("Successfully signed out!", Toasts.Type.SUCCESS);
                         }}
                         disabled={pending}
@@ -189,7 +189,7 @@ export default function Settings({ templateData }: SettingsProps) {
                                     setPending(true);
                                     try {
                                         await deleteData();
-                                        deleteToken();
+                                        deleteTokens();
 
                                         showToast("Successfully deleted songs!", Toasts.Type.SUCCESS);
                                     } finally {
@@ -210,19 +210,14 @@ export default function Settings({ templateData }: SettingsProps) {
     );
 }
 
-export function SettingsModal({ modalProps, ...props }: SettingsProps & { modalProps: ModalProps; }) {
+export function SettingsModal({ modalProps, ...props }: SettingsProps & { modalProps: RenderModalProps; }) {
     return (
         <ErrorBoundary>
-            <ModalRoot {...modalProps} size={ModalSize.LARGE}>
-                <ModalHeader>
-                    <BaseText size="xl" weight="bold">Song Spotlight</BaseText>
-                </ModalHeader>
-                <ModalContent>
-                    <div style={{ marginBottom: "20px" }}>
-                        <Settings {...props} />
-                    </div>
-                </ModalContent>
-            </ModalRoot>
+            <Modal {...modalProps} size="lg" title="Song Spotlight">
+                <div style={{ marginBottom: "20px" }}>
+                    <Settings {...props} />
+                </div>
+            </Modal>
         </ErrorBoundary>
     );
 }

@@ -11,15 +11,15 @@ import { DataStore } from "@api/index";
 import { definePluginSettings } from "@api/Settings";
 import { BaseText } from "@components/BaseText";
 import { Button } from "@components/Button";
+import { PencilIcon } from "@components/Icons";
 import { Paragraph } from "@components/Paragraph";
 import { Devs, EquicordDevs } from "@utils/constants";
 import { classNameFactory } from "@utils/css";
 import { Logger } from "@utils/Logger";
-import { openModal } from "@utils/modal";
 import definePlugin, { OptionType } from "@utils/types";
 import { Emoji, Message } from "@vencord/discord-types";
-import { findByPropsLazy, findExportedComponentLazy } from "@webpack";
-import { EmojiStore, Menu, TextInput, Toasts, useEffect, useState } from "@webpack/common";
+import { findByPropsLazy } from "@webpack";
+import { EmojiStore, Menu, openModal,TextInput, Toasts, useEffect, useState } from "@webpack/common";
 
 import { ClearAliasesConfirmModal } from "./components/modals/ClearAliasesConfirmModal";
 import { SetAliasModal } from "./components/modals/SetAliasModal";
@@ -99,7 +99,6 @@ interface MessageContextMenuArgs {
 const DATA_KEY = "emoji-aliases";
 const logger = new Logger("EmojiAlias");
 const EmojiQueryService = findByPropsLazy("queryEmojiResults");
-const PencilIcon = findExportedComponentLazy("PencilIcon");
 const cl = classNameFactory("vc-emoji-alias-");
 
 let aliasMap: AliasMap = {};
@@ -1101,8 +1100,9 @@ const messageSendListener = (_channelId: string, messageObj: { content: string; 
 export default definePlugin({
     name: "FavoriteEmojiFirst",
     authors: [Devs.Aria, Devs.Ven, EquicordDevs.justjxke],
-    tags: ["EmojiAlias"],
+    tags: ["Emotes", "Customisation"],
     description: "Puts your favorite emoji first in the emoji autocomplete and also has emoji alias.",
+    dependencies: ["MessagePopoverAPI"],
     settings,
     contextMenus: {
         "expression-picker": expressionPickerPatch,
@@ -1142,7 +1142,7 @@ export default definePlugin({
                     replace: "$1Infinity"
                 },
                 {
-                    match: /(\i)\.slice\(0,(Math\.max\(\i,\i(?:-\i\.length){2}\))\)/,
+                    match: /(\i)\.slice\(0,(Math\.max\(\d+?,\i(?:-\i\.length){2}\))\)/,
                     replace: "($1.sliceTo = $2, $1)"
                 }
             ]

@@ -20,7 +20,7 @@ import { gitHashShort } from "@shared/vencordUserAgent";
 import { Devs } from "@utils/constants";
 import { isTruthy } from "@utils/guards";
 import definePlugin, { IconProps, OptionType } from "@utils/types";
-import { findByPropsLazy } from "@webpack";
+import { waitFor } from "@webpack";
 import { React } from "@webpack/common";
 import type { ComponentType, PropsWithChildren, ReactNode } from "react";
 
@@ -46,7 +46,14 @@ const enum LayoutType {
     CUSTOM = 18
 }
 
-const LayoutTypes: typeof LayoutType = findByPropsLazy("SECTION", "SIDEBAR_ITEM", "PANEL");
+let LayoutTypes = {
+    SECTION: 1,
+    SIDEBAR_ITEM: 2,
+    PANEL: 3,
+    CATEGORY: 5,
+    CUSTOM: 19,
+};
+waitFor(["SECTION", "SIDEBAR_ITEM", "PANEL", "CUSTOM"], v => LayoutTypes = v);
 
 const enum SectionType {
     HEADER = "HEADER",
@@ -94,35 +101,28 @@ const settings = definePluginSettings({
         description: "Where to put the Equicord settings section",
         options: [
             { label: "At the very top", value: "top" },
-            { label: "Above the Nitro section", value: "aboveNitro", default: true },
-            { label: "Below the Nitro section", value: "belowNitro" },
-            { label: "Above Activity Settings", value: "aboveActivity" },
-            { label: "Below Activity Settings", value: "belowActivity" },
+            { label: "Above Billing section", value: "aboveNitro", default: true },
+            { label: "Below Billing section", value: "belowNitro" },
+            { label: "Above Games & Apps Settings", value: "aboveActivity" },
+            { label: "Below Games & Apps Settings", value: "belowActivity" },
             { label: "At the very bottom", value: "bottom" },
         ] as { label: string; value: SettingsLocation; default?: boolean; }[]
+    },
+    includeVencordInfoWhenCopying: {
+        type: OptionType.BOOLEAN,
+        description: "Also copy Equicord info (Equicord, Electron, Chromium) when clicking the version info in the bottom left area of the Settings page",
+        default: true
     }
 });
-
-const settingsSectionMap: [string, string][] = [
-    ["EquicordSettings", "equicord_main_panel"],
-    ["EquicordPlugins", "equicord_plugins_panel"],
-    ["EquicordThemes", "equicord_themes_panel"],
-    ["EquicordUpdater", "equicord_updater_panel"],
-    ["EquicordChangelog", "equicord_changelog_panel"],
-    ["EquicordCloud", "equicord_cloud_panel"],
-    ["EquicordBackupAndRestore", "equicord_backup_restore_panel"],
-    ["EquicordPatchHelper", "equicord_patch_helper_panel"],
-    ["EquibopSettings", "equicord_equibop_settings_panel"],
-];
 
 export default definePlugin({
     name: "Settings",
     description: "Adds Settings UI and debug info",
     authors: [Devs.Ven, Devs.Megu],
+    tags: ["Utility"],
     required: true,
 
     settings,
-    settingsSectionMap,
 
     patches: [
         {
@@ -133,17 +133,9 @@ export default definePlugin({
                     replace: "$&.replace(/^./, c => c.toUpperCase())"
                 },
                 {
-                    match: /"text-xxs\/normal".{0,300}?(?=null!=(\i)&&(.{0,20}\i\.Text.{0,200}?,children:).{0,15}?("span"),({className:\i\.\i,children:\["Build Override: ",\1\.id\]\})\)\}\))/,
-                    replace: (m, _buildOverride, makeRow, component, props) => {
-                        props = props.replace(/children:\[.+\]/, "");
-                        return `${m},$self.makeInfoElements(${component},${props}).map(e=>${makeRow}e})),`;
-                    }
-                },
-                {
-                    match: /"text-xs\/normal".{0,300}?\[\(0,\i\.jsxs?\)\((.{1,10}),(\{[^{}}]+\{.{0,20}className:\i.\i,.+?\})\)," "/,
-                    replace: (m, component, props) => {
-                        props = props.replace(/children:\[.+\]/, "");
-                        return `${m},$self.makeInfoElements(${component},${props})`;
+                    match: /"text-xxs\/normal".{0,300}?(?=null!=(\i)&&(.{0,20}\i\.\i.{0,200}?,children:).{0,15}?("span"),{className:(\i\.\i),children:\["Build Override: ",\1\.id,\i\]\}\)\}\))/,
+                    replace: (m, _buildOverride, makeRow, component, className) => {
+                        return `${m},$self.makeInfoElements(${component},${className}).map(e=>${makeRow}e})),`;
                     }
                 },
                 {
@@ -153,25 +145,10 @@ export default definePlugin({
             ]
         },
         {
-            find: "#{intl::USER_SETTINGS_ACTIONS_MENU_LABEL}",
-            replacement: {
-                // Skip the check Discord performs to make sure the section being selected in the user settings context menu is valid
-                match: /null!=\(\i=Object.values\(\i\.\i\).{0,50}?&&(?=\(0,\i\.openUserSettings\)\(\i,\{section:\i)/,
-                replace: ""
-            }
-        },
-        {
             find: ".buildLayout().map",
             replacement: {
                 match: /(\i)\.buildLayout\(\)(?=\.map)/,
                 replace: "$self.buildLayout($1)"
-            }
-        },
-        {
-            find: "getWebUserSettingFromSection",
-            replacement: {
-                match: /new Map\(\[(?=\[.{0,10}\.ACCOUNT,.{0,10}\.ACCOUNT_PANEL)/,
-                replace: "new Map([...$self.getSettingsSectionMappings(),"
             }
         }
     ],
@@ -183,24 +160,25 @@ export default definePlugin({
             key: key + "_panel",
             type: LayoutTypes.PANEL,
             useTitle: () => panelTitle,
-            buildLayout: () => [],
-            StronglyDiscouragedCustomComponent: () => <Component />,
-            render: () => <Component />,
+            buildLayout: () => [{
+                type: LayoutTypes.CATEGORY,
+                key: key + "_category",
+                buildLayout: () => [{
+                    type: LayoutTypes.CUSTOM,
+                    key: key + "_custom",
+                    Component: Component,
+                    useSearchTerms: () => [title]
+                }]
+            }]
         };
 
-        return {
+        return ({
             key,
             type: LayoutTypes.SIDEBAR_ITEM,
-            legacySearchKey: title.toUpperCase(),
-            getLegacySearchKey: () => title.toUpperCase(),
             useTitle: () => title,
             icon: () => <Icon width={20} height={20} />,
             buildLayout: () => [panel]
-        };
-    },
-
-    getSettingsSectionMappings() {
-        return settingsSectionMap;
+        });
     },
 
     buildLayout(originalLayoutBuilder: SettingsLayoutBuilder) {
@@ -257,7 +235,7 @@ export default definePlugin({
                 Component: BackupAndRestoreTab,
                 Icon: BackupRestoreIcon
             }),
-            IS_DEV && PatchHelperTab && buildEntry({
+            !IS_STANDALONE && PatchHelperTab && buildEntry({
                 key: "equicord_patch_helper",
                 title: "Patch Helper",
                 Component: PatchHelperTab,
@@ -279,9 +257,9 @@ export default definePlugin({
             top: "user_section",
             aboveNitro: "billing_section",
             belowNitro: "billing_section",
-            aboveActivity: "activity_section",
-            belowActivity: "activity_section",
-            bottom: "logout_section"
+            aboveActivity: "games_and_apps_section",
+            belowActivity: "games_and_apps_section",
+            bottom: "utility_section"
         };
 
         const key = places[settingsLocation] ?? places.top;
@@ -344,17 +322,13 @@ export default definePlugin({
     },
 
     getInfoString() {
+        if (!settings.store.includeVencordInfoWhenCopying) return "";
         return "\n" + this.getInfoRows().join("\n");
     },
 
-    makeInfoElements(
-        Component: ComponentType<React.PropsWithChildren>,
-        props: PropsWithChildren,
-    ) {
-        return this.getInfoRows().map((text, i) => (
-            <Component key={i} {...props}>
-                {text}
-            </Component>
-        ));
-    },
+    makeInfoElements(Component: ComponentType<PropsWithChildren<{ className?: string; }>>, className: string) {
+        return this.getInfoRows().map((text, i) =>
+            <Component key={i} className={className}>{text}</Component>
+        );
+    }
 });

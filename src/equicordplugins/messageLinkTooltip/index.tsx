@@ -11,6 +11,7 @@ import { getUserSettingLazy } from "@api/UserSettings";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
+import { Message } from "@vencord/discord-types";
 import { findComponentByCodeLazy } from "@webpack";
 import { ChannelStore, Constants, MessageStore, RestAPI, Tooltip, useEffect, useState, useStateFromStores } from "@webpack/common";
 import type { ComponentType } from "react";
@@ -62,6 +63,7 @@ const settings = definePluginSettings({
 export default definePlugin({
     name: "MessageLinkTooltip",
     description: "Adds a tooltip with a message preview when hovering over message links, replies, and forwarded messages.",
+    tags: ["Appearance", "Chat"],
     authors: [Devs.Kyuuhachi],
 
     settings,
@@ -152,7 +154,7 @@ function useMessage(channelId, messageId) {
         [MessageStore],
         () => MessageStore.getMessage(channelId, messageId)
     );
-    const [message, setMessage] = useState(cachedMessage);
+    const [message, setMessage] = useState<Message | undefined>(cachedMessage);
     useEffect(() => {
         if (message == null)
             (async () => {

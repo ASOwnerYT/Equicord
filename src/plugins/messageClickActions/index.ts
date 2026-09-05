@@ -287,9 +287,9 @@ function normalizeEmoji(emoji: string): string | null {
     const trimmed = emoji.trim();
     if (!trimmed) return null;
 
-    const customMatch = trimmed.match(/^:?([\w-]+):(\d+)$/);
+    const customMatch = trimmed.match(/^(?:<(?:(a):)?|:)?([\w-]+?)(?:~\d+)?:([0-9]+)>?$/);
     if (customMatch) {
-        return `${customMatch[1]}:${customMatch[2]}`;
+        return `${customMatch[2]}:${customMatch[3]}`;
     }
 
     return trimmed;
@@ -453,7 +453,8 @@ async function executeAction(
     action: ClickAction,
     msg: Message,
     channel: Channel,
-    event: MouseEvent
+    event: MouseEvent,
+    triggerModifier: Modifier = "NONE"
 ) {
     const myId = AuthenticationStore.getId();
     const isMe = msg.author.id === myId;
@@ -506,7 +507,7 @@ async function executeAction(
             if (!canReply(msg)) return;
             if (!canSend(channel)) return;
 
-            const isShiftPress = event.shiftKey;
+            const isShiftPress = event.shiftKey && triggerModifier !== "SHIFT";
             const shouldMention = isPluginEnabled(NoReplyMentionPlugin.name)
                 ? NoReplyMentionPlugin.shouldMention(msg, isShiftPress)
                 : !isShiftPress;
@@ -577,6 +578,7 @@ async function executeAction(
 export default definePlugin({
     name: "MessageClickActions",
     description: "Customize click actions on messages.",
+    tags: ["Chat", "Shortcuts"],
     authors: [Devs.Ven, EquicordDevs.keircn, EquicordDevs.ZcraftElite, EquicordDevs.omaw],
     isModified: true,
 
@@ -652,7 +654,7 @@ export default definePlugin({
             }
 
             if (isModifierPressed(tripleClickModifier) && tripleClickAction !== "NONE") {
-                executeAction(tripleClickAction, msg, channel, event);
+                executeAction(tripleClickAction, msg, channel, event, tripleClickModifier);
                 pressedModifiers.clear();
             }
             doubleClickFired = false;
@@ -683,7 +685,7 @@ export default definePlugin({
                 if (!canSend(channel)) return;
                 if (msg.deleted === true) return;
                 if (canDoubleClick && isQuickDoubleClick) {
-                    executeAction(doubleClickAction, msg, channel, event);
+                    executeAction(doubleClickAction, msg, channel, event, doubleClickModifier);
                     pressedModifiers.clear();
                 }
             };
@@ -715,7 +717,7 @@ export default definePlugin({
 
             const executeSingleClick = () => {
                 if (!doubleClickFired && !doubleClickDetected && isModifierPressed(singleClickModifier) && singleClickAction !== "NONE") {
-                    executeAction(singleClickAction, msg, channel, event);
+                    executeAction(singleClickAction, msg, channel, event, singleClickModifier);
                     pressedModifiers.clear();
                 }
                 resetClickState();
